@@ -7,9 +7,9 @@
     <packaging>jar</packaging>
     <dependencies>
         <dependency>
-            <groupId>org.alicebot</groupId>
+            <groupId>org.alicebot.ab</groupId>
             <artifactId>ab</artifactId>
-            <version>0.0.6.26</version>
+            <version>4.0.4-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.ullink.slack</groupId>

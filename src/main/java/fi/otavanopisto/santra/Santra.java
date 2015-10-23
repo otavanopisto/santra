@@ -9,15 +9,14 @@ import com.ullink.slack.simpleslackapi.SlackSession;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import java.io.IOException;
 import java.util.Scanner;
+import java.util.logging.Level;
+import lombok.extern.java.Log;
 import org.alicebot.ab.Bot;
 import org.alicebot.ab.Chat;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 
-/**
- *
- * @author Ilmo Euro
- */
+@Log
 public class Santra {
 
     public static void main(String... args) throws IOException {
@@ -51,8 +50,9 @@ public class Santra {
         slackConnection.connect();
 
         slackConnection.addMessagePostedListener((event, sess) -> {
-            String prefix = "@santra ";
+            String prefix = "!" + arguments.getNickName() + " ";
             String message = event.getMessageContent();
+            log.log(Level.SEVERE, "slack message: {0}", message);
             if (!message.startsWith(prefix)) {
                 return;
             } else {
@@ -60,6 +60,7 @@ public class Santra {
             }
 
             String response = chatSession.multisentenceRespond(message);
+            log.log(Level.SEVERE, "slack response: {0}", response);
             sess.sendMessage(event.getChannel(),
                              response,
                              null);

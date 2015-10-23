@@ -19,9 +19,14 @@ public class CommandLineArguments {
     private String basePath = "./";
     @Getter
     @Option(name = "-n",
-            usage = "The bot name",
+            usage = "The AIML bot name",
             metaVar = "<name>")
     private String botName = "santra";
+    @Getter
+    @Option(name = "-s",
+            usage = "Slack nickname",
+            metaVar = "<nick>")
+    private String nickName = "santra";
     @Getter
     @Option(name = "-t",
             usage = "Slack authentication token",
