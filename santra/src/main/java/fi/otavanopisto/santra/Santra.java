@@ -8,7 +8,6 @@ package fi.otavanopisto.santra;
 import com.ullink.slack.simpleslackapi.SlackSession;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import java.io.IOException;
-import java.util.Scanner;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 import org.alicebot.ab.Bot;
@@ -33,8 +32,6 @@ public class Santra {
             return;
         }
 
-        Scanner scanner = new Scanner(System.in);
-
         Bot bot = new Bot(
                 arguments.getBotName(),
                 arguments.getBasePath()
@@ -50,9 +47,8 @@ public class Santra {
         slackConnection.connect();
 
         slackConnection.addMessagePostedListener((event, sess) -> {
-            String prefix = "!" + arguments.getNickName() + " ";
-            String message = event.getMessageContent();
-            log.log(Level.SEVERE, "slack message: {0}", message);
+            String prefix = "<@" + sess.sessionPersona().getId() + ">";
+            String message = event.getMessageContent().trim();
             if (!message.startsWith(prefix)) {
                 return;
             } else {
@@ -60,7 +56,6 @@ public class Santra {
             }
 
             String response = chatSession.multisentenceRespond(message);
-            log.log(Level.SEVERE, "slack response: {0}", response);
             sess.sendMessage(event.getChannel(),
                              response,
                              null);
