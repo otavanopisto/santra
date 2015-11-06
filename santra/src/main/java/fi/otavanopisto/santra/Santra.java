@@ -16,9 +16,6 @@
  */
 package fi.otavanopisto.santra;
 
-import com.ullink.slack.simpleslackapi.SlackSession;
-import com.ullink.slack.simpleslackapi.events.SlackMessagePosted;
-import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -42,9 +39,9 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 public class Santra {
 
     private Bot bot;
-    private SlackSession slackConnection;
     private final Random random = new Random();
     private final CommandLineArguments arguments;
+    private final SantraConnector santraConnector;
     private List<String> admins;
     private final Map<String, Chat>
             chats = Collections.synchronizedMap(new HashMap<>());
@@ -59,17 +56,7 @@ public class Santra {
         admins = Arrays.asList(arguments.getAdmins().split(","));
         initBot();
 
-        log.info("opening slack connection...");
-        slackConnection
-                = SlackSessionFactory.createWebSocketSlackSession(
-                        arguments.getAuthenticationToken()
-                );
-
-        slackConnection.connect();
-        log.info("slack connection opened");
-
-        slackConnection.addMessagePostedListener(
-                this::onMessagePosted);
+        santraConnector.addMessageListener(this::onMessage);
     }
 
     @Synchronized
@@ -88,54 +75,40 @@ public class Santra {
         log.info("bot created");
     }
 
-    private void onMessagePosted(
-            SlackMessagePosted event,
-            SlackSession session
+    private void onMessage(
+            String sender,
+            String message,
+            SantraConnector.MessageSession session
     ) {
-        log.info("message received");
-        String prefix = "<@" + session.sessionPersona().getId() + ">";
-        String message = event.getMessageContent().trim();
-        if (!message.startsWith(prefix)) {
-            return;
-        } else {
-            message = message.substring(prefix.length()).trim();
-        }
-
         if (message.startsWith("!")) {
-            commandMessage(message.substring(1), event, session);
+            commandMessage(sender, message.substring(1), session);
         } else {
-            chatMessage(message, event, session);
+            chatMessage(sender, message, session);
         }
     }
 
     private void chatMessage(
+            String sender,
             String message,
-            SlackMessagePosted event,
-            SlackSession session
+            SantraConnector.MessageSession session
     ) {
-        String senderName = event.getSender().getUserName();
-        chats.putIfAbsent(senderName, new Chat(bot));
+        chats.putIfAbsent(sender, new Chat(bot));
 
         String response = String.format(
                 "@%s %s",
-                senderName,
-                chats.get(senderName).multisentenceRespond(message));
-        session.sendMessage(event.getChannel(),
-                response,
-                null);
+                sender,
+                chats.get(sender).multisentenceRespond(message));
+        session.sendMessage(response);
     }
 
     private void commandMessage(
+            String sender,
             String message,
-            SlackMessagePosted event,
-            SlackSession session
+            SantraConnector.MessageSession session
     ) {
-        if (!admins.contains(event.getSender().getUserName())) {
+        if (!admins.contains(sender)) {
             session.sendMessage(
-                    event.getChannel(),
-                    NOSY_RESPONSES[random.nextInt(NOSY_RESPONSES.length)],
-                    null
-            );
+                    NOSY_RESPONSES[random.nextInt(NOSY_RESPONSES.length)]);
             return;
         }
         if (message.startsWith("reload")) {
@@ -145,15 +118,10 @@ public class Santra {
             }
             try {
                 reload(botName);
-                session.sendMessage(
-                    event.getChannel(),
-                    "Reload complete.",
-                    null);
+                session.sendMessage("Reload complete.");
             } catch (IOException | GitAPIException ex) {
                 session.sendMessage(
-                    event.getChannel(),
-                    String.format("Reload failed: %s.", ex.getMessage()),
-                    null);
+                    String.format("Reload failed: %s.", ex.getMessage()));
             }
         }
     }

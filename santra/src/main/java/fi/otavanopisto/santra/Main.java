@@ -34,7 +34,8 @@ public class Main {
             return;
         }
 
-        final Santra santra = new Santra(arguments);
+        SlackConnector slackConnector = new SlackConnector(arguments.getAuthenticationToken());
+        final Santra santra = new Santra(arguments, slackConnector);
         santra.run();
     }
 }
