@@ -10,6 +10,9 @@ import com.ullink.slack.simpleslackapi.events.SlackMessagePosted;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import lombok.Synchronized;
 import lombok.extern.java.Log;
@@ -27,9 +30,18 @@ public class Santra {
     private Bot bot;
     private Chat chatSession;
     private SlackSession slackConnection;
+    private final Random random = new Random();
     private final CommandLineArguments arguments;
+    private List<String> admins;
+    private static final String[] NOSY_RESPONSES = {
+        "No chance.",
+        "Who do you think you are?",
+        "Yeah, right.",
+        "When cows fly!"
+    };
 
     public void run() throws IOException {
+        admins = Arrays.asList(arguments.getAdmins().split(","));
         initBot();
 
         log.info("opening slack connection...");
@@ -69,7 +81,7 @@ public class Santra {
         if (!message.startsWith(prefix)) {
             return;
         } else {
-            message = message.substring(prefix.length());
+            message = message.substring(prefix.length()).trim();
         }
 
         if (message.startsWith("!")) {
@@ -95,17 +107,25 @@ public class Santra {
             SlackMessagePosted event,
             SlackSession session
     ) {
+        if (!admins.contains(event.getSender().getUserName())) {
+            session.sendMessage(
+                    event.getChannel(),
+                    NOSY_RESPONSES[random.nextInt(NOSY_RESPONSES.length)],
+                    null
+            );
+            return;
+        }
         if ("reload".equals(message)) {
             try {
                 reload();
                 session.sendMessage(
                     event.getChannel(),
-                    "reload complete",
+                    "Reload complete.",
                     null);
             } catch (IOException | GitAPIException ex) {
                 session.sendMessage(
                     event.getChannel(),
-                    String.format("reload failed: %s", ex.getMessage()),
+                    String.format("Reload failed: %s.", ex.getMessage()),
                     null);
             }
         }
@@ -114,7 +134,7 @@ public class Santra {
     private void reload() throws IOException, GitAPIException {
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
         Repository repository = builder
-                .setGitDir(new File(arguments.getBasePath()))
+                .setGitDir(new File(arguments.getBasePath() + "/.git"))
                 .readEnvironment()
                 .findGitDir()
                 .build();

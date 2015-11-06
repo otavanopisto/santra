@@ -26,5 +26,10 @@ public class CommandLineArguments {
     @Option(name = "-t",
             usage = "Slack authentication token",
             metaVar = "<token>")
-    private String authenticationToken;
+    private String authenticationToken = "";
+    @Getter
+    @Option(name = "-a",
+            usage = "The nicks of admins, separated by commas",
+            metaVar = "<nicks>")
+    private String admins = "";
 }

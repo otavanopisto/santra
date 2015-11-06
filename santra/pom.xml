@@ -51,7 +51,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>fi.otavanopisto.santra.Santra</mainClass>
+                            <mainClass>fi.otavanopisto.santra.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
