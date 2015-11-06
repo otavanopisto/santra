@@ -11,7 +11,10 @@ import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import lombok.Synchronized;
@@ -28,11 +31,12 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 public class Santra {
 
     private Bot bot;
-    private Chat chatSession;
     private SlackSession slackConnection;
     private final Random random = new Random();
     private final CommandLineArguments arguments;
     private List<String> admins;
+    private final Map<String, Chat>
+            chats = Collections.synchronizedMap(new HashMap<>());
     private static final String[] NOSY_RESPONSES = {
         "No chance.",
         "Who do you think you are?",
@@ -59,16 +63,18 @@ public class Santra {
 
     @Synchronized
     private void initBot() {
+        initBot(arguments.getBotName());
+    }
+
+    @Synchronized
+    private void initBot(String botName) {
         log.info("creating bot...");
         bot = new Bot(
-                arguments.getBotName(),
+                botName,
                 arguments.getBasePath()
         );
+        chats.clear();
         log.info("bot created");
-        
-        log.info("opening chat session...");
-        chatSession = new Chat(bot);
-        log.info("chat session opened");
     }
 
     private void onMessagePosted(
@@ -96,7 +102,13 @@ public class Santra {
             SlackMessagePosted event,
             SlackSession session
     ) {
-        String response = chatSession.multisentenceRespond(message);
+        String senderName = event.getSender().getUserName();
+        chats.putIfAbsent(senderName, new Chat(bot));
+
+        String response = String.format(
+                "@%s %s",
+                senderName,
+                chats.get(senderName).multisentenceRespond(message));
         session.sendMessage(event.getChannel(),
                 response,
                 null);
@@ -115,9 +127,13 @@ public class Santra {
             );
             return;
         }
-        if ("reload".equals(message)) {
+        if (message.startsWith("reload")) {
+            String botName = message.substring("reload".length()).trim();
+            if ("".equals(botName)) {
+                botName = arguments.getBotName();
+            }
             try {
-                reload();
+                reload(botName);
                 session.sendMessage(
                     event.getChannel(),
                     "Reload complete.",
@@ -131,7 +147,7 @@ public class Santra {
         }
     }
 
-    private void reload() throws IOException, GitAPIException {
+    private void reload(String botName) throws IOException, GitAPIException {
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
         Repository repository = builder
                 .setGitDir(new File(arguments.getBasePath() + "/.git"))
@@ -142,6 +158,6 @@ public class Santra {
         git.pull()
            .call();
 
-        initBot();
+        initBot(botName);
     }
 }
