@@ -24,6 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import lombok.RequiredArgsConstructor;
 import lombok.Synchronized;
 import lombok.extern.java.Log;
@@ -45,12 +48,14 @@ public class Santra {
     private List<String> admins;
     private final Map<String, Chat>
             chats = Collections.synchronizedMap(new HashMap<>());
+    private final ReadWriteLock botLock = new ReentrantReadWriteLock();
     private static final String[] NOSY_RESPONSES = {
         "No chance.",
         "Who do you think you are?",
         "Yeah, right.",
         "When cows fly!"
     };
+
 
     public void run() throws IOException {
         admins = Arrays.asList(arguments.getAdmins().split(","));
@@ -59,19 +64,23 @@ public class Santra {
         santraConnector.addMessageListener(this::onMessage);
     }
 
-    @Synchronized
     private void initBot() {
         initBot(arguments.getBotName());
     }
 
-    @Synchronized
     private void initBot(String botName) {
         log.info("creating bot...");
-        bot = new Bot(
-                botName,
-                arguments.getBasePath()
-        );
-        chats.clear();
+        Lock lock = botLock.writeLock();
+        try {
+            lock.lock();
+            bot = new Bot(
+                    botName,
+                    arguments.getBasePath()
+            );
+            chats.clear();
+        } finally {
+            lock.unlock();
+        }
         log.info("bot created");
     }
 
@@ -92,12 +101,19 @@ public class Santra {
             String message,
             SantraConnector.MessageSession session
     ) {
-        chats.putIfAbsent(sender, new Chat(bot));
+        String response = "";
+        Lock lock = botLock.readLock();
+        try {
+            lock.lock();
+            chats.putIfAbsent(sender, new Chat(bot));
 
-        String response = String.format(
-                "@%s %s",
-                sender,
-                chats.get(sender).multisentenceRespond(message));
+            response = String.format(
+                    "@%s %s",
+                    sender,
+                    chats.get(sender).multisentenceRespond(message));
+        } finally {
+            lock.unlock();
+        }
         session.sendMessage(response);
     }
 
@@ -131,7 +147,6 @@ public class Santra {
         Repository repository = builder
                 .setGitDir(new File(arguments.getBasePath() + "/.git"))
                 .readEnvironment()
-                .findGitDir()
                 .build();
         Git git = new Git(repository);
         git.pull()
