@@ -26,13 +26,14 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import lombok.RequiredArgsConstructor;
-import lombok.Synchronized;
 import lombok.extern.java.Log;
 import org.alicebot.ab.Bot;
 import org.alicebot.ab.Chat;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ResetCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -48,12 +49,12 @@ public class Santra {
     private List<String> admins;
     private final Map<String, Chat>
             chats = Collections.synchronizedMap(new HashMap<>());
-    private final ReadWriteLock botLock = new ReentrantReadWriteLock();
+    private final Lock botLock = new ReentrantLock();
     private static final String[] NOSY_RESPONSES = {
-        "No chance.",
-        "Who do you think you are?",
-        "Yeah, right.",
-        "When cows fly!"
+        "Ja kukas sä luulet olevas?",
+        "Ei oo, ei tuu.",
+        "Hyvä yritys.",
+        "Lataa ite!"
     };
 
 
@@ -70,16 +71,15 @@ public class Santra {
 
     private void initBot(String botName) {
         log.info("creating bot...");
-        Lock lock = botLock.writeLock();
         try {
-            lock.lock();
+            botLock.lock();
             bot = new Bot(
                     botName,
                     arguments.getBasePath()
             );
             chats.clear();
         } finally {
-            lock.unlock();
+            botLock.unlock();
         }
         log.info("bot created");
     }
@@ -102,9 +102,8 @@ public class Santra {
             SantraConnector.MessageSession session
     ) {
         String response = "";
-        Lock lock = botLock.readLock();
         try {
-            lock.lock();
+            botLock.lock();
             chats.putIfAbsent(sender, new Chat(bot));
 
             response = String.format(
@@ -112,7 +111,7 @@ public class Santra {
                     sender,
                     chats.get(sender).multisentenceRespond(message));
         } finally {
-            lock.unlock();
+            botLock.unlock();
         }
         session.sendMessage(response);
     }
@@ -124,7 +123,9 @@ public class Santra {
     ) {
         if (!admins.contains(sender)) {
             session.sendMessage(
-                    NOSY_RESPONSES[random.nextInt(NOSY_RESPONSES.length)]);
+                String.format("@%s %s",
+                    sender,
+                    NOSY_RESPONSES[random.nextInt(NOSY_RESPONSES.length)]));
             return;
         }
         if (message.startsWith("reload")) {
@@ -143,15 +144,29 @@ public class Santra {
     }
 
     private void reload(String botName) throws IOException, GitAPIException {
+        log.info("Starting bot reload");
         FileRepositoryBuilder builder = new FileRepositoryBuilder();
         Repository repository = builder
                 .setGitDir(new File(arguments.getBasePath() + "/.git"))
                 .readEnvironment()
                 .build();
+        log.info("Starting repository update");
         Git git = new Git(repository);
+        git.reset()
+           .setMode(ResetCommand.ResetType.HARD)
+           .call();
+        log.info("Reset complete");
+        git.clean()
+           .call();
+        log.info("Clean compete");
+        git.fetch()
+           .call();
+        log.info("Fetch complete");
         git.pull()
            .call();
+        log.info("Repository update finished");
 
         initBot(botName);
+        log.info("Bot reloaded");
     }
 }
